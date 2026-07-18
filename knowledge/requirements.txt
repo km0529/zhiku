@@ -1,0 +1,15 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch
+torchvision
+
+
+minio
+langchain-openai
+langgraph
+grandalf
+pymilvus[model]
+pymilvus
+sentence-transformers
+pymongo
+openai-agents
