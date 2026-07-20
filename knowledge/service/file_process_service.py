@@ -58,7 +58,7 @@ class FileProcessService:
         except Exception as e:
             logger.error(e)
             update_task_status(task_id,TASK_STATUS_FAILED)
-            return import_file_path,file_dir,task_id
+            raise FileProcessingError(message=f"文件上传失败: {e}")
         #3. 将文件保存到MinIO(做个备份,就算报错也没关系)
         self._save_file_to_remote(import_file_path,file.filename)
 

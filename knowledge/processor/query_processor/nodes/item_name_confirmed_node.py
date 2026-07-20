@@ -8,7 +8,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from knowledge.processor.query_processor.base import BaseNode
 from knowledge.processor.query_processor.config import QueryConfig
 from knowledge.processor.query_processor.state import QueryGraphState
-from knowledge.prompts.query_prompt import ITEM_NAME_SYSTEM_EXTRACT_TEMPLATE, ITEM_NAME_USER_EXTRACT_TEMPLATE
+from knowledge.prompts.query_prompt import ITEM_NAME_SYSTEM_EXTRACT_TEMPLATE, ITEM_NAME_USER_EXTRACT_TEMPLATE, CHITCHAT_ANSWER
 from knowledge.utils.clients.ai_clients import AIClients
 from knowledge.utils.clients.storage_clients import StorageClients
 from knowledge.utils.embedding_util import generate_bge_m3_hybrid_vectors
@@ -30,7 +30,7 @@ class _ItemNameAligner:
         confirmed,options = self._align(search_result)
 
         if len(confirmed) > 1:
-            final_confirmed = self._item_name_score_filter()
+            confirmed = self._item_name_score_filter(confirmed, search_result)
 
         return confirmed,options
 
@@ -277,8 +277,13 @@ class _ItemNameExtractor:
         else:
             rewritten_query = original_rewritten_query.strip()
 
+        # 2.4 获取is_chitchat
+        is_chitchat = llm_content_obj.get("is_chitchat", False)
+        if not isinstance(is_chitchat, bool):
+            is_chitchat = False
+
         # 3. 返回Dict
-        return {"item_names": item_names, "rewritten_query": rewritten_query}
+        return {"item_names": item_names, "rewritten_query": rewritten_query, "is_chitchat": is_chitchat}
 
 class ItemNameConfirmedNode(BaseNode):
     name = "item_name_confirmed_node"
@@ -339,10 +344,19 @@ class ItemNameConfirmedNode(BaseNode):
         confirmed,options = self._item_name_aligner.search_and_align(extracted_item_names)
         # 5. 决策
         rewritten_query = llm_result.get("rewritten_query")
-        self._dicide(confirmed,options,state,rewritten_query)
+        is_chitchat = llm_result.get("is_chitchat", False)
+        self._dicide(confirmed, options, state, rewritten_query, is_chitchat)
         return state
 
-    def _dicide(self, confirmed: List[str], options: List[str], state: QueryGraphState, rewritten_query: str):
+    def _dicide(self, confirmed: List[str], options: List[str], state: QueryGraphState, rewritten_query: str, is_chitchat: bool = False):
+        # 闲聊检测：如果LLM判定为闲聊且没有提取到商品名，直接设置系统介绍
+        if is_chitchat and not confirmed:
+            self.logger.info(f"检测到闲聊输入: {state.get('original_query')}，跳过检索管道")
+            state["item_names"] = []
+            state["rewritten_query"] = rewritten_query
+            state["answer"] = CHITCHAT_ANSWER
+            return
+
         #1. 判断confirmed中是否有数据
         if confirmed:
             state["item_names"] = confirmed

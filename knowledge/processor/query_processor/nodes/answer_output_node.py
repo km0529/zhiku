@@ -1,8 +1,6 @@
 from typing import Dict, Any, List, Tuple
 
 from langchain_openai import ChatOpenAI
-from typer.cli import state
-
 from knowledge.processor.query_processor.base import BaseNode, T
 from knowledge.processor.query_processor.state import QueryGraphState
 from knowledge.prompts.query_prompt import ANSWER_PROMPT

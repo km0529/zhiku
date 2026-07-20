@@ -176,7 +176,7 @@ class ItemNameRecognitionNode(BaseNode):
             schema.add_field(
                 field_name="dense_vector",
                 datatype=DataType.FLOAT_VECTOR,
-                dim=1024
+                dim=self.config.embedding_dim
             )
             schema.add_field(
                 field_name="sparse_vector",

@@ -39,7 +39,7 @@ class _BgeCrossEncoderRerankClient:
         scores = self._ce.predict(
             pairs,
             batch_size=batch_size,
-            activation_fn=nn.Identity(),
+            activation_fct=nn.Identity(),
             show_progress_bar=False,
             **kwargs,
         )
@@ -192,8 +192,8 @@ class AIClients(BaseClientManager):
             cross = CrossEncoder(
                 model_name_or_path,
                 device=device,
-                model_kwargs=model_kwargs or None,
-                activation_fn=nn.Identity(),
+                automodel_args=model_kwargs or None,
+                default_activation_function=nn.Identity(),
                 max_length=512,
             )
             logger.info("BGE 重排序客户端已使用 sentence-transformers CrossEncoder 初始化（兼容 transformers 5+）")

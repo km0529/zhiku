@@ -1,5 +1,6 @@
 import base64
 import re
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from typing import Tuple, List, Dict
@@ -14,23 +15,17 @@ from knowledge.utils.clients.ai_clients import AIClients
 from knowledge.utils.clients.storage_clients import StorageClients
 
 
+@dataclass
 class ImageContext:
-    head_title:str
-    pre_context:str
-    post_context:str
-    def __init__(self,head_title:str,pre_context:str,post_context:str):
-        self.head_title = head_title
-        self.pre_context = pre_context
-        self.post_context = post_context
+    head_title: str
+    pre_context: str
+    post_context: str
 
+@dataclass
 class ImageInfo:
-    image_name:str
-    image_path:str
-    image_context:ImageContext
-    def __init__(self,image_name:str,image_path:str,image_context:ImageContext):
-        self.image_name = image_name
-        self.image_path = image_path
-        self.image_context = image_context
+    image_name: str
+    image_path: str
+    image_context: ImageContext
 
 class _MdFileHandler:
     def __init__(self,logger:Logger,node_name:str):
@@ -311,7 +306,6 @@ class _ImageUploader:
     def upload_and_replace(self,md_lines,document_name:str,image_info_list:List[ImageInfo],image_summarizes:Dict[str,str]) -> str:
         #1. 上传图片
         remote_urls = self._upload_all(document_name,image_info_list)
-        print(remote_urls)
         #2. 替换md中的内容,返回替换之后的md的内容
         new_md_content = self._replace_md_content(md_lines,image_summarizes,remote_urls)
 

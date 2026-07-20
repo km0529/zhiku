@@ -11,7 +11,7 @@ from knowledge.schema.upload_schema import UploadResponse, TaskStatusResponse
 from knowledge.service.file_process_service import FileProcessService
 from knowledge.utils.task_util import get_task_info
 
-CHAT_URL = "http://localhost:8011/front/chat.html"
+CHAT_URL = "http://localhost:8011/front/index.html"
 
 
 def register_router(app: FastAPI):
