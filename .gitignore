@@ -8,6 +8,7 @@ htmlcov/
 .env.local
 .env.*.local
 temp_data/
+output_dir/
 *.pdf
 *.zip
 images/
