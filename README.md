@@ -74,6 +74,89 @@
     └──────────────┘       └──────────────┘        └──────────────┘
 ```
 
+## 🔄 核心业务流程
+
+两条工作流均基于 LangGraph 的 `StateGraph` 构建，节点之间通过状态字典传递数据。
+
+### 1. 文档导入流水线（Import Pipeline）
+
+流程定义见 [main_graph.py](knowledge/processor/import_processor/main_graph.py)：
+
+```
+entry_node（判断文件类型）
+   ├── PDF ──→ pdf_to_md_node（MinerU 解析为 Markdown）─→ md_image_node
+   └── MD ──→ md_image_node（图片提取并上传 MinIO，替换为在线链接）
+                        │
+                        ▼
+              document_split_node（语义切分：按标题/段落/列表拆块）
+                        │
+                        ▼
+              item_name_recognition_node（LLM 识别商品名称）
+                        │
+                        ▼
+              bge_embedding_chunks_node（BGE-M3 向量化）
+                        │
+                        ▼
+              milvus_import_node（写入 Milvus 向量库）
+                        │
+                        ▼
+                       END
+```
+
+**执行入口**：`FileProcessService.run_main_graph()`，上传后由 `BackgroundTasks` 后台执行。
+
+**节点职责说明**：
+
+| 节点 | 职责 | 关键技术 |
+|------|------|----------|
+| [entry_node](knowledge/processor/import_processor/nodes/entry_node.py) | 判断文件类型（PDF/MD），决定后续路径 | 文件扩展名检测 |
+| [pdf_to_md_node](knowledge/processor/import_processor/nodes/pdf_to_md_node.py) | PDF → Markdown 转换 | MinerU API |
+| [md_image_node](knowledge/processor/import_processor/nodes/md_image_node.py) | 图片提取并上传 MinIO，替换为在线链接 | MinIO 对象存储 |
+| [document_split_node](knowledge/processor/import_processor/nodes/document_split_node.py) | 按标题/段落/列表语义切分 | 自定义分块策略 |
+| [item_name_recognition_node](knowledge/processor/import_processor/nodes/item_name_recognition_node.py) | LLM 识别商品名称/型号 | LLM + Prompt 工程 |
+| [bge_embedding_chunks_node](knowledge/processor/import_processor/nodes/bge_embedding_chunks_node.py) | 生成 1024 维稠密向量 | BGE-M3 本地模型 |
+| [milvus_import_node](knowledge/processor/import_processor/nodes/milvus_import_node.py) | 向量与元数据写入 Milvus | pymilvus 批量写入 |
+
+### 2. 知识查询流水线（Query Pipeline）
+
+流程定义见 [main_graph.py](knowledge/processor/query_processor/main_graph.py)：
+
+```
+item_name_confirmed_node（识别问题商品，必要时发起澄清；重写查询）
+        │
+        ├──（已有答案）──→ answer_output_node
+        └──（继续检索）──→ multi_search
+                 ├──→ vector_search_node（BGE-M3 向量检索）
+                 ├──→ hyde_search_node（LLM 生成假设答案后检索）
+                 └──→ web_search_node（MCP 网络搜索）
+                        │
+                        ▼
+                   join ──→ rrf_merge_node（RRF 倒排融合）
+                        │
+                        ▼
+                   rerank_node（BGE-Reranker 精排，失败则降级为默认评分）
+                        │
+                        ▼
+                   answer_output_node（LLM 生成答案，SSE 流式输出）
+                        │
+                        ▼
+                       END
+```
+
+**执行入口**：`QueryService.run_query_graph()`。流式模式下，各节点通过 `sse_util.push_sse_event()` 推送 `progress` 事件，答案节点逐字推送 `delta`，结束时推送 `final`。
+
+**节点职责说明**：
+
+| 节点 | 职责 | 关键技术 |
+|------|------|----------|
+| [item_name_confirmed_node](knowledge/processor/query_processor/nodes/item_name_confirmed_node.py) | 识别问题商品，必要时发起澄清；重写查询 | LLM + 上下文管理 |
+| [vector_search_node](knowledge/processor/query_processor/nodes/vector_search_node.py) | BGE-M3 向量相似度检索 | Milvus + 向量检索 |
+| [hyde_search_node](knowledge/processor/query_processor/nodes/hyde_search_node.py) | LLM 生成假设性答案后检索 | HyDE 策略 |
+| [web_search_node](knowledge/processor/query_processor/nodes/web_search_node.py) | 网络搜索补充外部信息 | MCP 协议 |
+| [rrf_merge_node](knowledge/processor/query_processor/nodes/rrf_merge_node.py) | RRF 倒排融合多路检索结果 | 倒排融合算法 |
+| [rerank_node](knowledge/processor/query_processor/nodes/rerank_node.py) | CrossEncoder 精准重排序 | BGE-Reranker |
+| [answer_output_node](knowledge/processor/query_processor/nodes/answer_output_node.py) | LLM 生成答案 + SSE 流式输出 | LLM + SSE |
+
 ## 📁 目录结构
 
 ```
