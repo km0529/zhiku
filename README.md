@@ -1,4 +1,4 @@
-# 掌柜智库 · 企业知识库智能问答平台
+# 智能知识库检索平台 · 企业级 RAG 问答系统
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)
